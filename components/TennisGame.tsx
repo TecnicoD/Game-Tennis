@@ -18,7 +18,7 @@ import {
   BOUNCE_DAMPING,
   FRICTION
 } from '../constants';
-import { GameStatus, PlayerState, BallState, KeyState } from '../types';
+import { GameStatus, PlayerState, BallState, KeyState, GameMode } from '../types';
 import { updateScore } from '../utils/scoring';
 import { ScoreBoard } from './ScoreBoard';
 import { Menu } from './Menu';
@@ -99,6 +99,7 @@ export const TennisGame: React.FC = () => {
   const [gameStatus, setGameStatus] = useState<GameStatus>(GameStatus.MENU);
   const [winnerId, setWinnerId] = useState<number | null>(null);
   const [message, setMessage] = useState<string>("");
+  const [gameMode, setGameMode] = useState<GameMode>('PVP');
 
   // Logic Refs
   const keys = useRef<KeyState>({});
@@ -122,7 +123,7 @@ export const TennisGame: React.FC = () => {
     score: '0',
     sets: 0,
     id: 2,
-    name: 'Player 2',
+    name: 'Player 2', // Will be updated to CPU if mode selected
     isSwinging: false,
     swingProgress: 0
   };
@@ -182,12 +183,15 @@ export const TennisGame: React.FC = () => {
     resetBallToServe(server);
 
     setGameStatus(GameStatus.SERVING);
-    setMessage(`${server === 1 ? "PLAYER 1" : "PLAYER 2"} SERVE`);
+    const p1Name = "PLAYER 1";
+    const p2Name = p2Ref.current.name === "CPU" ? "CPU" : "PLAYER 2";
+    setMessage(`${server === 1 ? p1Name : p2Name} SERVE`);
   }, [resetBallToServe]);
 
   const handlePointEnd = useCallback((winnerId: 1 | 2, reason: string) => {
     setGameStatus(GameStatus.POINT_ENDED);
-    setMessage(`${reason} - ${winnerId === 1 ? 'P1' : 'P2'} WINS POINT`);
+    const winnerName = winnerId === 1 ? "P1" : (p2Ref.current.name === "CPU" ? "CPU" : "P2");
+    setMessage(`${reason} - ${winnerName} WINS POINT`);
 
     const winner = winnerId === 1 ? p1Ref.current : p2Ref.current;
     const loser = winnerId === 1 ? p2Ref.current : p1Ref.current;
@@ -212,8 +216,93 @@ export const TennisGame: React.FC = () => {
     }
   }, [startPoint]);
 
+  const runAI = useCallback(() => {
+    // Reset P2 Keys first
+    keys.current[KEYS.P2_UP] = false;
+    keys.current[KEYS.P2_DOWN] = false;
+    keys.current[KEYS.P2_LEFT] = false;
+    keys.current[KEYS.P2_RIGHT] = false;
+    keys.current[KEYS.P2_SWING] = false;
+
+    const p2 = p2Ref.current;
+    const ball = ballRef.current;
+    const p1 = p1Ref.current;
+
+    // 1. Serving Logic
+    if (gameStatus === GameStatus.SERVING && servingPlayer.current === 2) {
+       if (ball.speed === 0 && !p2.isSwinging) {
+         // Wait a random bit then toss (simulated by key press)
+         if (Math.random() < 0.05) keys.current[KEYS.P2_SWING] = true;
+       } else if (ball.z > 30 && ball.vz < 0 && !p2.isSwinging) {
+         // Hit it on the way down
+         keys.current[KEYS.P2_SWING] = true;
+         // Aim randomly
+         if (Math.random() > 0.5) keys.current[KEYS.P2_LEFT] = true;
+         else keys.current[KEYS.P2_RIGHT] = true;
+       }
+       return;
+    }
+
+    if (gameStatus !== GameStatus.PLAYING && gameStatus !== GameStatus.SERVING) return;
+
+    // 2. Movement Logic
+    // Predict where ball land is hard, so let's just track X and keep reasonable Y
+    let targetX = ball.pos.x;
+    
+    // Basic Baseline play
+    let targetY = CANVAS_HEIGHT - 100; 
+    
+    // If ball is very short, move up
+    if (ball.pos.y > NET_Y && ball.pos.y < CANVAS_HEIGHT - 200 && ball.velocity.y > 0) {
+       targetY = ball.pos.y + 50; // Move to intercept
+    }
+
+    // If ball is on other side and moving fast, return to center
+    if (ball.pos.y < NET_Y) {
+      targetX = CANVAS_WIDTH / 2;
+    }
+
+    const diffX = targetX - p2.pos.x;
+    const diffY = targetY - p2.pos.y;
+
+    if (Math.abs(diffX) > 15) {
+      if (diffX > 0) keys.current[KEYS.P2_RIGHT] = true;
+      else keys.current[KEYS.P2_LEFT] = true;
+    }
+
+    if (Math.abs(diffY) > 15) {
+      if (diffY > 0) keys.current[KEYS.P2_DOWN] = true;
+      else keys.current[KEYS.P2_UP] = true;
+    }
+
+    // 3. Swing Logic
+    const dx = ball.pos.x - p2.pos.x;
+    const dy = ball.pos.y - p2.pos.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (dist < HIT_RANGE && ball.z < HIT_HEIGHT_LIMIT && ball.pos.y > NET_Y) {
+       // Don't swing if we just hit it
+       if (ball.lastHitter !== 2) {
+         keys.current[KEYS.P2_SWING] = true;
+         
+         // Aiming Logic: Hit away from player 1
+         if (p1.pos.x < CANVAS_WIDTH / 2) {
+            keys.current[KEYS.P2_RIGHT] = true; // P1 is left, hit right
+         } else {
+            keys.current[KEYS.P2_LEFT] = true; // P1 is right, hit left
+         }
+       }
+    }
+
+  }, [gameStatus]);
+
   const updatePhysics = useCallback(() => {
     const ball = ballRef.current;
+
+    // Run CPU Logic if mode is CPU
+    if (gameMode === 'CPU') {
+      runAI();
+    }
 
     // 1. Player Movement & Swing
     [p1Ref.current, p2Ref.current].forEach(p => {
@@ -370,13 +459,13 @@ export const TennisGame: React.FC = () => {
 
           if (up) {
             // Smash / Drive
-            shotSpeed += 4;
-            shotArc = 5; 
+            shotSpeed += 7;
+            shotArc = 6; 
             // Aim deeper/limit net clips
             targetY = isP1 ? CANVAS_HEIGHT - 50 : 50;
           } else if (down) {
             // Lob / Drop
-            shotSpeed -= 3;
+            shotSpeed -= 5;
             shotArc = 14; // High arc
             // Aim shorter
             targetY = isP1 ? NET_Y + 200 : NET_Y - 200;
@@ -396,7 +485,7 @@ export const TennisGame: React.FC = () => {
       }
     });
 
-  }, [gameStatus, handlePointEnd, resetBallToServe]);
+  }, [gameStatus, handlePointEnd, resetBallToServe, gameMode, runAI]);
 
   // --- RENDER ---
   const render = useCallback(() => {
@@ -424,6 +513,14 @@ export const TennisGame: React.FC = () => {
       ctx.strokeStyle = 'white';
       ctx.lineWidth = 2;
       ctx.stroke();
+      
+      // CPU Label for P2
+      if (p.id === 2 && gameMode === 'CPU') {
+        ctx.fillStyle = 'white';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText("CPU", p.pos.x, p.pos.y - 35);
+      }
 
       // Racket
       ctx.save();
@@ -499,7 +596,7 @@ export const TennisGame: React.FC = () => {
        ctx.fillText(message, CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
     }
 
-  }, [message]);
+  }, [message, gameMode]);
 
   // Loop
   useEffect(() => {
@@ -512,11 +609,17 @@ export const TennisGame: React.FC = () => {
     return () => cancelAnimationFrame(requestRef.current);
   }, [updatePhysics, render]);
 
-  const startGame = () => {
+  const startGame = (mode: GameMode) => {
+    setGameMode(mode);
+    
+    const p2Name = mode === 'CPU' ? 'CPU' : 'Player 2';
+    const p2Initial = { ...initP2, name: p2Name };
+
     setP1ScoreState({ ...initP1 });
-    setP2ScoreState({ ...initP2 });
+    setP2ScoreState({ ...p2Initial });
     p1Ref.current = { ...initP1 };
-    p2Ref.current = { ...initP2 };
+    p2Ref.current = { ...p2Initial };
+    
     setWinnerId(null);
     setGameStatus(GameStatus.SERVING);
     startPoint(1);
@@ -530,7 +633,7 @@ export const TennisGame: React.FC = () => {
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 text-white">
           <h1 className="font-arcade text-6xl text-yellow-400 mb-4">MATCH OVER</h1>
           <p className="text-3xl mb-10 text-blue-200 font-bold">
-            {winnerId === 1 ? 'PLAYER 1' : 'PLAYER 2'} WINS!
+            {winnerId === 1 ? 'PLAYER 1' : (gameMode === 'CPU' ? 'CPU' : 'PLAYER 2')} WINS!
           </p>
           <button 
             onClick={() => setGameStatus(GameStatus.MENU)}

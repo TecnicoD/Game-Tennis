@@ -8,6 +8,8 @@ export type Vector = {
   y: number;
 };
 
+export type GameMode = 'PVP' | 'CPU';
+
 export enum GameStatus {
   MENU = 'MENU',
   SERVING = 'SERVING', // New state for serving

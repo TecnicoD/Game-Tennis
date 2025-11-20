@@ -1,7 +1,8 @@
 import React from 'react';
+import { GameMode } from '../types';
 
 interface MenuProps {
-  onStart: () => void;
+  onStart: (mode: GameMode) => void;
 }
 
 export const Menu: React.FC<MenuProps> = ({ onStart }) => {
@@ -47,12 +48,20 @@ export const Menu: React.FC<MenuProps> = ({ onStart }) => {
            </ul>
         </div>
 
-        <button
-          onClick={onStart}
-          className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded font-bold text-xl hover:scale-105 transition-transform shadow-lg hover:shadow-blue-500/50"
-        >
-          ENTER COURT
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={() => onStart('PVP')}
+            className="flex-1 py-4 bg-gradient-to-r from-blue-600 to-blue-800 rounded font-bold text-lg hover:scale-105 transition-transform shadow-lg hover:shadow-blue-500/50 border border-blue-400"
+          >
+            PVP (2P)
+          </button>
+          <button
+            onClick={() => onStart('CPU')}
+            className="flex-1 py-4 bg-gradient-to-r from-red-600 to-red-800 rounded font-bold text-lg hover:scale-105 transition-transform shadow-lg hover:shadow-red-500/50 border border-red-400"
+          >
+            VS CPU
+          </button>
+        </div>
       </div>
     </div>
   );
