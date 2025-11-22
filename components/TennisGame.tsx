@@ -22,6 +22,7 @@ import { GameStatus, PlayerState, BallState, KeyState, GameMode } from '../types
 import { updateScore } from '../utils/scoring';
 import { ScoreBoard } from './ScoreBoard';
 import { Menu } from './Menu';
+import { MobileControls } from './MobileControls';
 
 // --- HELPERS ---
 
@@ -156,6 +157,10 @@ export const TennisGame: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
+  }, []);
+
+  const handleManualInput = useCallback((key: string, pressed: boolean) => {
+    keys.current[key] = pressed;
   }, []);
 
   // --- GAMEPLAY ---
@@ -519,7 +524,7 @@ export const TennisGame: React.FC = () => {
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText("CPU", p.pos.x, p.pos.y - 35);
+        ctx.fillText("CPU", p.pos.x, p.pos.y - 30);
       }
 
       // Racket
@@ -629,6 +634,10 @@ export const TennisGame: React.FC = () => {
     <div className="relative w-full h-screen bg-neutral-900 flex justify-center items-center overflow-hidden">
       {gameStatus === GameStatus.MENU && <Menu onStart={startGame} />}
       
+      {gameStatus !== GameStatus.MENU && (
+        <MobileControls onInput={handleManualInput} />
+      )}
+
       {gameStatus === GameStatus.GAME_OVER && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 text-white">
           <h1 className="font-arcade text-6xl text-yellow-400 mb-4">MATCH OVER</h1>

@@ -44,7 +44,7 @@ export const Menu: React.FC<MenuProps> = ({ onStart }) => {
              <li>Press <span className="text-yellow-400">SWING</span> to Serve.</li>
              <li>Move to the ball and press <span className="text-yellow-400">SWING</span> to hit.</li>
              <li>Aim with movement keys while hitting.</li>
-             <li>Don't let it bounce twice!</li>
+             <li>Dont let it bounce twice </li>
            </ul>
         </div>
 
