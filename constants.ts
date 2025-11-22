@@ -16,7 +16,7 @@ export const BALL_RADIUS = 12; // Slightly larger visibility
 export const PLAYER_RADIUS = 25;
 
 // Physics Constants
-export const GRAVITY = 0.4; // Reduced from 0.5 for floatier ball
+export const GRAVITY = 0.314; // Reduced from 0.5 for floatier ball
 export const NET_HEIGHT = 30; 
 export const NET_Y = CANVAS_HEIGHT / 2;
 export const INITIAL_BALL_SPEED = 14;

@@ -1,3 +1,4 @@
+
 export type Point = {
   x: number;
   y: number;
@@ -12,7 +13,7 @@ export type GameMode = 'PVP' | 'CPU';
 
 export enum GameStatus {
   MENU = 'MENU',
-  SERVING = 'SERVING', // New state for serving
+  SERVING = 'SERVING',
   PLAYING = 'PLAYING',
   POINT_ENDED = 'POINT_ENDED',
   GAME_OVER = 'GAME_OVER',
@@ -37,8 +38,12 @@ export interface BallState {
   velocity: Vector; // Ground velocity
   vz: number; // Vertical velocity
   speed: number; // Base speed magnitude
+  
+  // --- Logic State ---
   lastHitter: 1 | 2 | null;
   bounceCount: number; // Number of bounces since last hit
+  hasCrossedNet: boolean; // Has the ball crossed the net line since the last hit?
+  lastBounceSide: 'p1' | 'p2' | null; // Which side (top/bottom) did it last touch?
 }
 
 export interface GameDimensions {
